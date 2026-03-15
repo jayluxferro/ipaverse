@@ -12,17 +12,13 @@ struct DownloadedView: View {
     let account: Account
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \DownloadedApp.downloadDate, order: .reverse) private var downloadedApps: [DownloadedApp]
-    @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var downloadStates: [String: DownloadState] = [:]
-    
+
     var body: some View {
         NavigationStack {
             Group {
-                if isLoading {
-                    ProgressView("Loading downloaded apps...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = errorMessage {
+                if let error = errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 48))
@@ -84,14 +80,7 @@ struct DownloadedView: View {
     }
     
     private func loadDownloadedApps() {
-        isLoading = true
         errorMessage = nil
-        
-        Task {
-            await MainActor.run {
-                isLoading = false
-            }
-        }
     }
     
     private func redownloadApp(_ downloadedApp: DownloadedApp) {

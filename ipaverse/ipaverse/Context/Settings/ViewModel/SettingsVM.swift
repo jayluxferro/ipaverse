@@ -11,7 +11,6 @@ import SwiftData
 @MainActor
 final class SettingsVM: ObservableObject {
     @Published var settings: SettingsModel
-    @EnvironmentObject var loginViewModel: LoginVM
 
     init() {
         self.settings = SettingsModel()
@@ -46,18 +45,16 @@ final class SettingsVM: ObservableObject {
         saveSettings()
     }
 
-    func clearSearchHistory() {
+    func clearSearchHistory(modelContext: ModelContext) {
         UserDefaults.standard.removeObject(forKey: "SearchHistory")
         NotificationCenter.default.post(name: .searchHistoryCleared, object: nil)
-    }
 
-    func clearAllSwiftData() {
+        // Clear all downloaded apps from SwiftData
         do {
-            let context = try ModelContext(ModelContainer(for: DownloadedApp.self))
-            try context.delete(model: DownloadedApp.self)
-            try context.save()
+            try modelContext.delete(model: DownloadedApp.self)
+            try modelContext.save()
         } catch {
-            print("SwiftData temizleme hatası: \(error)")
+            print("SwiftData clearing error: \(error)")
         }
     }
 

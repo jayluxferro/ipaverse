@@ -21,6 +21,11 @@ final class LoginVM: ObservableObject {
     @Published var showAuthCodeField: Bool = false
     @Published var errorMessage: String = ""
     @Published var toastMessage: String = ""
+    @Published var isEmailValid: Bool = true
+    @Published var isPasswordValid: Bool = true
+    @Published var hasEmailBeenEdited: Bool = false
+    @Published var hasPasswordBeenEdited: Bool = false
+    @Published private(set) var isLoginInProgress: Bool = false
 
     // MARK: - SERVICES
 
@@ -50,8 +55,10 @@ final class LoginVM: ObservableObject {
     func login() async {
         guard validateInputs() else { return }
 
-        loginState = .loading
+        isLoginInProgress = true
         errorMessage = ""
+
+        defer { isLoginInProgress = false }
 
         do {
             let credentials = LoginCredentials(
@@ -96,10 +103,13 @@ final class LoginVM: ObservableObject {
         resetForm()
         loginState = .idle
     }
-    
+
     func resendAuthCode() async {
+        isLoginInProgress = true
         errorMessage = ""
         authCode = ""
+
+        defer { isLoginInProgress = false }
 
         let credentials = LoginCredentials(
             email: email,
@@ -107,27 +117,27 @@ final class LoginVM: ObservableObject {
             authCode: nil,
             rememberMe: rememberMe
         )
-        
+
         do {
             let account = try await appStoreService.login(credentials: credentials)
-            
+
             if rememberMe {
                 try keychainService.saveCredentials(credentials)
             }
-            
+
             try keychainService.saveAccount(account)
-            
+
             loginState = .success(account)
             saveUserEmail()
         } catch LoginError.twoFactorRequired {
             showAuthCodeField = true
             loginState = .requires2FA
             errorMessage = "New verification code sent. Please check your device."
-            
+
         } catch LoginError.invalidCredentials {
             loginState = .error("Invalid Apple ID or password")
             errorMessage = "Invalid Apple ID or password"
-            
+
         } catch {
             loginState = .error(error.localizedDescription)
             errorMessage = error.localizedDescription
@@ -140,12 +150,12 @@ final class LoginVM: ObservableObject {
 
             loginState = .idle
             resetForm()
-            
+
             if let message {
                 toastMessage = message
             }
         } catch {
-            errorMessage = "An error occurred while logging out.: \(error.localizedDescription)"
+            errorMessage = "An error occurred while logging out: \(error.localizedDescription)"
             loginState = .error(error.localizedDescription)
         }
     }
@@ -159,15 +169,22 @@ final class LoginVM: ObservableObject {
     private func setupBindings() {
         $email
             .dropFirst()
-            .sink { [weak self] _ in
-                self?.errorMessage = ""
+            .sink { [weak self] email in
+                guard let self = self else { return }
+                self.errorMessage = ""
+                self.hasEmailBeenEdited = true
+                let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+                self.isEmailValid = trimmedEmail.isEmpty || self.isValidEmail(trimmedEmail)
             }
             .store(in: &cancellables)
 
         $password
             .dropFirst()
-            .sink { [weak self] _ in
-                self?.errorMessage = ""
+            .sink { [weak self] password in
+                guard let self = self else { return }
+                self.errorMessage = ""
+                self.hasPasswordBeenEdited = true
+                self.isPasswordValid = !password.isEmpty
             }
             .store(in: &cancellables)
 
@@ -200,15 +217,32 @@ final class LoginVM: ObservableObject {
     }
 
     private func validateInputs() -> Bool {
-        guard !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedEmail.isEmpty else {
+            hasEmailBeenEdited = true
+            isEmailValid = false
             errorMessage = "Apple ID required"
             return false
         }
 
+        guard isValidEmail(trimmedEmail) else {
+            hasEmailBeenEdited = true
+            isEmailValid = false
+            errorMessage = "Please enter a valid email address"
+            return false
+        }
+
+        isEmailValid = true
+
         guard !password.isEmpty else {
+            hasPasswordBeenEdited = true
+            isPasswordValid = false
             errorMessage = "Password required"
             return false
         }
+
+        isPasswordValid = true
 
         if showAuthCodeField && authCode.isEmpty {
             errorMessage = "Verification code required"
@@ -225,16 +259,17 @@ final class LoginVM: ObservableObject {
         rememberMe = true
         showAuthCodeField = false
         errorMessage = ""
+        isEmailValid = true
+        isPasswordValid = true
+        hasEmailBeenEdited = false
+        hasPasswordBeenEdited = false
     }
 }
 
 // MARK: - Computed Properties
 extension LoginVM {
     var isLoading: Bool {
-        if case .loading = loginState {
-            return true
-        }
-        return false
+        isLoginInProgress
     }
 
     var isLoggedIn: Bool {
@@ -249,5 +284,19 @@ extension LoginVM {
             return account
         }
         return nil
+    }
+
+    var isLoginButtonEnabled: Bool {
+        if showAuthCodeField {
+            return !authCode.isEmpty
+        }
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return isValidEmail(trimmedEmail) && !password.isEmpty
+    }
+
+    func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
     }
 }

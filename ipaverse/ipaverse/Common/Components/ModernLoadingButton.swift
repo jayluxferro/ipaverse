@@ -38,7 +38,7 @@ struct ModernLoadingButton: View {
                     endPoint: .trailing
                 )
             )
-            .foregroundColor(.primary)
+            .foregroundColor(.white)
             .cornerRadius(16)
             .shadow(color: isEnabled.wrappedValue ? .blue.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
         }

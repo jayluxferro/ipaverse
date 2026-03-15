@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 enum DownloadState {
     case idle
@@ -52,7 +53,9 @@ final class SearchVM: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.searchHistory = []
+            Task { @MainActor in
+                self?.searchHistory = []
+            }
         }
     }
 
@@ -98,9 +101,7 @@ final class SearchVM: ObservableObject {
                     platform: selectedPlatform
                 )
 
-                guard let results = result.results else { return }
-
-                searchResults = results
+                searchResults = result.results ?? []
                 isLoading = false
                 isSearching = false
 
@@ -173,7 +174,9 @@ final class SearchVM: ObservableObject {
         let fileName = "\(app.bundleID ?? "")_\(app.version ?? "").\(fileExtension)"
 
         savePanel.nameFieldStringValue = fileName
-        savePanel.allowedContentTypes = [.init(filenameExtension: fileExtension)!]
+        if let contentType = UTType(filenameExtension: fileExtension) {
+            savePanel.allowedContentTypes = [contentType]
+        }
         savePanel.canCreateDirectories = true
 
         savePanel.begin { [weak self] response in

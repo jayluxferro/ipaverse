@@ -11,6 +11,7 @@ struct SettingsView: View {
     @StateObject private var viewModel = SettingsVM()
     @EnvironmentObject var loginViewModel: LoginVM
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         NavigationStack {
@@ -18,7 +19,6 @@ struct SettingsView: View {
                 VStack(spacing: 20) {
                     downloadSettingsSection
                     searchHistorySection
-                    databaseSection
                     logoutSection
                 }
                 .padding(.horizontal, 16)
@@ -141,7 +141,7 @@ struct SettingsView: View {
 
     private var clearHistoryCard: some View {
         Button {
-            viewModel.clearSearchHistory()
+            viewModel.clearSearchHistory(modelContext: modelContext)
         } label: {
             HStack {
                 Image(systemName: "trash")
@@ -191,46 +191,6 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
         }
-    }
-
-    private var databaseSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader(title: "Database")
-
-            VStack(spacing: 12) {
-                clearDatabaseCard
-            }
-        }
-    }
-
-    private var clearDatabaseCard: some View {
-        Button {
-            viewModel.clearAllSwiftData()
-        } label: {
-            HStack {
-                Image(systemName: "trash.circle")
-                    .foregroundColor(.orange)
-                    .font(.system(.body, design: .default))
-
-                Text("Clear All Downloaded Apps")
-                    .font(.system(.body, design: .default, weight: .medium))
-                    .foregroundColor(.orange)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.orange)
-            }
-            .padding(16)
-            .background(Color(.controlBackgroundColor))
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.orange.opacity(0.2), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     private func sectionHeader(title: String) -> some View {
